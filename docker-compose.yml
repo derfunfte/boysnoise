@@ -1,0 +1,16 @@
+version: '3.9'
+
+services:
+  xtts-webui:
+    # Wir nutzen ein aktuelles und gut gepflegtes Image
+    image: ghcr.io/coqui-ai/tts-webui:latest
+    container_name: xtts_service
+    ports:
+      # Wir mappen den internen Port des Containers auf den Host-Port
+      - "7860:7860"
+    volumes:
+      # Wir erstellen Volumes, um unsere Modelle und Audio-Outputs persistent zu speichern
+      - ./models:/app/models
+      - ./outputs:/app/outputs
+    # WICHTIG für Gitpod: Docker benötigt erweiterte Rechte im Workspace
+    privileged: true

@@ -1,0 +1,17 @@
+tasks:
+  - name: Setup & Start TTS Service
+    init: |
+      # Gitpod's Docker-Daemon starten
+      dockerd-up &
+      # Warten, bis der Docker-Daemon bereit ist
+      while ! docker info > /dev/null 2>&1; do echo "Waiting for Docker daemon..."; sleep 1; done
+      # Docker-Compose anweisen, das Image zu laden und den Container zu bauen/starten
+      docker-compose up -d --build
+    command: |
+      # Sicherstellen, dass der Container läuft
+      docker-compose logs -f
+
+ports:
+  # Port des TTS-Webinterfaces für den Zugriff freigeben
+  - port: 7860
+    onOpen: open-preview
