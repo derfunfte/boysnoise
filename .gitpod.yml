@@ -1,22 +1,16 @@
 tasks:
-  - name: Setup & Start TTS Service
-    init: |
-      # Gitpod's Docker-Daemon starten
-      dockerd-up &
-      # Warten, bis der Docker-Daemon bereit ist
-      while ! docker info > /dev/null 2>&1; do echo "Waiting for Docker daemon..."; sleep 1; done
-      # Docker-Compose anweisen, das Image zu laden und den Container zu bauen/starten
-      docker-compose up -d --build
+  - init: |
+      echo "Willkommen in Ihrer Voice Cloning Umgebung."
+      echo "Das Coqui TTS Docker Image ist startklar."
+      # Hier könnten weitere Initialisierungs-Skripte stehen
     command: |
-      # Sicherstellen, dass der Container läuft
-      docker-compose logs -f
+      echo "Um den TTS-Server zu starten, führen Sie 'tts-server --model_name tts_models/multilingual/multi-dataset/xtts_v2' aus."
 
-ports:
-  # Port des TTS-Webinterfaces für den Zugriff freigeben
-  - port: 7860
-    onOpen: open-preview
+# Konfiguration, um das Docker-Image zu verwenden
+image:
+  file: .gitpod.Dockerfile
 
+# Ports, die wir für die Web-Oberfläche freigeben wollen
 ports:
-  # Port des TTS-Webinterfaces für den Zugriff freigeben
-  - port: 7860
+  - port: 5002
     onOpen: open-preview
