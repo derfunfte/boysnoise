@@ -1,5 +1,3 @@
-version: '3.9'
-
 services:
   xtts-webui:
     # Wir nutzen ein aktuelles und gut gepflegtes Image
