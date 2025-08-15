@@ -1,16 +1,35 @@
+# Definieren der Aufgabe(n), die beim Start des Workspaces ausgeführt werden sollen.
 tasks:
-  - init: |
-      echo "Willkommen in Ihrer Voice Cloning Umgebung."
-      echo "Das Coqui TTS Docker Image ist startklar."
-      # Hier könnten weitere Initialisierungs-Skripte stehen
+  - name: Setup & Validation
+    init: |
+      echo "Gitpod-Umgebung wird initialisiert..."
+      # Erstellen der Verzeichnisstruktur für unser Projekt.
+      mkdir -p /workspace/audio_fuer_finetuning
+      mkdir -p /workspace/trainings_output
+      echo "Verzeichnisstruktur wurde angelegt."
+      echo "Die Coqui TTS Umgebung ist einsatzbereit."
     command: |
-      echo "Um den TTS-Server zu starten, führen Sie 'tts-server --model_name tts_models/multilingual/multi-dataset/xtts_v2' aus."
+      echo "-----------------------------------------------------"
+      echo "WILLKOMMEN IM PROJEKT 'STIMMKLON SOUVERÄN'"
+      echo "-----------------------------------------------------"
+      echo "Um die Funktionalität zu testen, können Sie den TTS-Server starten oder direkt ein Kommandozeilen-Rendering durchführen."
+      echo "Beispiel für Zero-Shot Klonen (benötigt eine Referenz-WAV-Datei):"
+      echo "tts --model_name tts_models/multilingual/multi-dataset/xtts_v2 --text 'Hallo Welt, dies ist ein Test.' --speaker_wav /pfad/zu/ihrer/stimme.wav --language_idx de --out_path test.wav"
+      echo "-----------------------------------------------------"
 
-# Konfiguration, um das Docker-Image zu verwenden
+# Spezifikation unseres Docker-Images für die Umgebung.
 image:
   file: .gitpod.Dockerfile
 
-# Ports, die wir für die Web-Oberfläche freigeben wollen
+# Konfiguration der Ports für den TTS-Webserver.
 ports:
   - port: 5002
-    onOpen: open-preview
+    onOpen: ignore
+    name: Coqui TTS Server
+    description: Web-Interface für die Sprachsynthese.
+
+# Vorkonfiguration für VS Code, um die Nutzererfahrung zu optimieren.
+vscode:
+  extensions:
+    - ms-python.python
+    - ms-toolsai.jupyter
