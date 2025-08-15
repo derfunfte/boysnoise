@@ -85,6 +85,46 @@ class TestSynthesizeSpeech(unittest.TestCase):
         self.assertIn("A critical error occurred in the model loader.", status) # stderr
 
     @patch('app.subprocess.run')
+    def test_synthesis_with_timeout_error(self, mock_subprocess_run):
+        """Should return a specific timeout error message if the TTS process times out."""
+        # Configure the mock to raise a TimeoutExpired exception
+        mock_subprocess_run.side_effect = subprocess.TimeoutExpired(
+            cmd="tts --text 'Dieser Text ist sehr lang'",
+            timeout=120
+        )
+
+        audio_path, status = synthesize_speech("Dieser Text ist sehr, sehr lang.", self.mock_speaker_wav, "Deutsch")
+
+        # Assert that no audio path is returned
+        self.assertIsNone(audio_path)
+
+        # Assert that the status message indicates a timeout
+        self.assertIn("FEHLER: Der Prozess 'Synthese' hat das Zeitlimit von 120 Sekunden überschritten", status)
+
+    @patch('app.subprocess.run')
+    def test_conversion_with_timeout_error(self, mock_subprocess_run):
+        """Should return a specific timeout error message if the ffmpeg process times out."""
+        # Create a dummy mp3 file to trigger the conversion path
+        with tempfile.NamedTemporaryFile(suffix=".mp3", delete=False) as temp_mp3_file:
+            mp3_path = temp_mp3_file.name
+        
+        mock_mp3_input = MagicMock()
+        mock_mp3_input.name = mp3_path
+
+        # Configure the mock to raise a TimeoutExpired exception
+        mock_subprocess_run.side_effect = subprocess.TimeoutExpired(
+            cmd="ffmpeg -i input.mp3 output.wav",
+            timeout=30
+        )
+
+        try:
+            audio_path, status = synthesize_speech("Test", mock_mp3_input, "Deutsch")
+            self.assertIsNone(audio_path)
+            self.assertIn("FEHLER: Der Prozess 'Audiokonvertierung (ffmpeg)' hat das Zeitlimit von 30 Sekunden überschritten", status)
+        finally:
+            os.remove(mp3_path)
+
+    @patch('app.subprocess.run')
     def test_command_construction_and_language_mapping(self, mock_subprocess_run):
         """Should construct the tts command with the correct arguments and language index."""
         mock_subprocess_run.return_value = MagicMock() # Simulate success
@@ -105,7 +145,7 @@ class TestSynthesizeSpeech(unittest.TestCase):
             "--language_idx", expected_lang_idx,
             "--out_path", ANY # The exact path is dynamic, so we check for its presence
         ]
-        mock_subprocess_run.assert_called_with(expected_command_parts, check=True, capture_output=True, text=True, encoding='utf-8')
+        mock_subprocess_run.assert_called_with(expected_command_part, check=True, capture_output=True, text=True, encoding='utf-8', timeout=120)
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)

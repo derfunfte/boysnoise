@@ -81,7 +81,10 @@ def synthesize_speech(text, speaker_wav, language):
         return output_path, status_message
 
     except subprocess.TimeoutExpired as e:
-        context = "Synthese" if "tts" in str
+        context = "Synthese" if "tts" in str(e.cmd) else "Audiokonvertierung (ffmpeg)"
+        error_message = f"FEHLER: Der Prozess '{context}' hat das Zeitlimit von {e.timeout} Sekunden überschritten und wurde abgebrochen. Dies kann bei sehr langen Texten oder hoher Systemlast passieren."
+        logging.error(error_message)
+        return None, error_message
     except subprocess.CalledProcessError as e:
         context = "Synthese" if "tts" in str(e.cmd) else "Audiokonvertierung (ffmpeg)"
         error_message = f"FEHLER bei der {context}:\n\nExit-Code: {e.returncode}\n\n--- STDOUT ---\n{e.stdout}\n\n--- STDERR ---\n{e.stderr}"
