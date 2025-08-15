@@ -1,3 +1,7 @@
+# ...
+      # Starte die GUI im Hintergrund, damit der Terminal frei bleibt
+      python /workspace/boysnoise/app.py &
+# ...
 import gradio as gr
 import subprocess
 import os
