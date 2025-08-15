@@ -2,6 +2,7 @@ tasks:
   - name: Setup & Validation
     init: |
       echo "Initialisiere Gitpod-Umgebung für Coqui TTS..."
+      pip install gradio
       mkdir -p /workspace/audio_fuer_finetuning
       mkdir -p /workspace/trainings_output
       echo "Verzeichnisstruktur wurde angelegt."
@@ -16,7 +17,12 @@ tasks:
       echo ""
       echo "Beispiel für Zero-Shot Klonen (benötigt eine Referenz-WAV-Datei):"
       echo "tts --model_name tts_models/multilingual/multi-dataset/xtts_v2 --text 'Hallo Welt, dies ist ein Test.' --speaker_wav /pfad/zu/ihrer/stimme.wav --language_idx de --out_path output.wav"
-      echo "-----------------------------------------------------"
+      echo -e "\033[1;32m-----------------------------------------------------\033[0m"
+      echo "Die Nevo-Techno GUI startet im Hintergrund und öffnet sich in einem neuen Tab."
+      echo "Dieser Terminal bleibt für Ihre Befehle verfügbar."
+      # Starte die GUI im Hintergrund, damit der Terminal frei bleibt
+      python /workspace/boysnoise/app.py &
+      echo -e "\033[1;32m-----------------------------------------------------\033[0m"
 
 image:
   file: .gitpod.Dockerfile
@@ -26,6 +32,10 @@ ports:
     onOpen: open-browser
     name: Coqui TTS Server
     description: Web-Interface für die Sprachsynthese.
+  - port: 7860
+    onOpen: open-browser
+    name: Nevo-Techno GUI
+    description: Benutzerdefinierte Oberfläche für die Sprachsynthese.
 
 vscode:
   extensions:
