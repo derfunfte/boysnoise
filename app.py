@@ -10,8 +10,6 @@ import tempfile
 import gradio as gr
 
 # Verzeichnis für generierte Audiodateien, falls es nicht existiert
-# Erstelle das Verzeichnis für generierte Audiodateien, falls es nicht existiert
-
 output_dir = "/workspace/trainings_output"
 os.makedirs(output_dir, exist_ok=True)
 
@@ -43,7 +41,7 @@ def synthesize_speech(text, speaker_wav, language):
     if not text or not text.strip():
         return None, "Fehler: Der Eingabetext darf nicht leer sein."
     if speaker_wav is None:
-        return None, "Fehler: Bitte laden Sie eine Referenz-WAV-Datei hoch."
+        return None, "Fehler: Bitte laden Sie eine Referenz-Audiodatei hoch."
 
     speaker_wav_path = speaker_wav.name
     converted_wav_path = None
@@ -57,7 +55,15 @@ def synthesize_speech(text, speaker_wav, language):
             with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as temp_wav:
                 converted_wav_path = temp_wav.name
             
-            ffmpeg_command = ["ffmpeg", "-i", speaker_wav_path, "-y", converted_wav_path]
+            # Konvertiere zu WAV mit den für xtts_v2 erforderlichen Spezifikationen (22050 Hz, mono)
+            ffmpeg_command = [
+                "ffmpeg",
+                "-i", speaker_wav_path,
+                "-ar", "22050",  # Abtastrate auf 22050 Hz setzen
+                "-ac", "1",      # Audiokanäle auf 1 (mono) setzen
+                "-y",            # Bestehende Datei ohne Nachfrage überschreiben
+                converted_wav_path
+            ]
             logging.info(f"Führe Konvertierung aus: {' '.join(shlex.quote(c) for c in ffmpeg_command)}")
             
             try:
@@ -85,11 +91,17 @@ def synthesize_speech(text, speaker_wav, language):
             "--out_path", output_path
         ]
 
-        logging.info(f"Executing command: {' '.join(shlex.quote(c) for c in command)}")
-        process = subprocess.run(command, check=True, capture_output=True, text=True, encoding='utf-8')
-        status_message = f"Synthese erfolgreich abgeschlossen!\n\nLog:\n{process.stdout}\n{process.stderr}"
-        return output_path, status_message
-
+        try:
+            logging.info(f"Executing command: {' '.join(shlex.quote(c) for c in command)}")
+            process = subprocess.run(command, check=True, capture_output=True, text=True, encoding='utf-8')
+            status_message = f"Synthese erfolgreich abgeschlossen!\n\nLog:\n{process.stdout}\n{process.stderr}"
+            return output_path, status_message
+        except subprocess.CalledProcessError as e:
+            error_message = f"FEHLER bei der Synthese:\n\nExit-Code: {e.returncode}\n\n--- STDOUT ---\n{e.stdout}\n\n--- STDERR ---\n{e.stderr}"
+            return None, error_message
+        except Exception as e:
+            logging.error(f"Ein unerwarteter Fehler ist aufgetreten: {e}", exc_info=True)
+            return None, f"Ein unerwarteter Fehler ist aufgetreten: {str(e)}"
     finally:
         # Räume die temporär konvertierte Datei auf, falls eine erstellt wurde
         if converted_wav_path and os.path.exists(converted_wav_path):
