@@ -5,7 +5,7 @@ import subprocess
 from unittest.mock import patch, MagicMock, ANY
 
 # Import the function and variables we need to test from app.py
-from app import synthesize_speech, output_dir, lang_map
+from app import synthesize_speech, output_dir, LANG_MAP
 
 class TestSynthesizeSpeech(unittest.TestCase):
 
@@ -37,7 +37,7 @@ class TestSynthesizeSpeech(unittest.TestCase):
         """Should return an error if the speaker_wav file is None."""
         audio_path, status = synthesize_speech("Hallo Welt", None, "Deutsch")
         self.assertIsNone(audio_path)
-        self.assertIn("Bitte laden Sie eine Referenz-WAV-Datei hoch", status)
+        self.assertIn("Bitte laden Sie eine Referenz-Audiodatei hoch", status)
 
     @patch('app.subprocess.run')
     def test_successful_synthesis(self, mock_subprocess_run):
@@ -92,7 +92,7 @@ class TestSynthesizeSpeech(unittest.TestCase):
         # Test with a specific language
         test_text = "This is a test in Japanese"
         test_language = "Japanisch"
-        expected_lang_idx = lang_map[test_language] # "ja"
+        expected_lang_idx = LANG_MAP[test_language] # "ja"
 
         synthesize_speech(test_text, self.mock_speaker_wav, test_language)
 
