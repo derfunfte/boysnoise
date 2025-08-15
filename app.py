@@ -7,6 +7,7 @@ import time
 import tempfile
 
 # Third-party imports
+from pydantic import ConfigDict
 import gradio as gr
 
 # Verzeichnis für generierte Audiodateien, falls es nicht existiert
@@ -100,7 +101,7 @@ def synthesize_speech(text, speaker_wav, language):
             f.write(f"Error: {str(e)}\n")
             import traceback
             traceback.print_exc(file=f)
-            f.write("--- END OF ERROR ---")
+            f.write("--- END OF ERROR ---\n")
         return None, f"Ein unerwarteter Fehler ist aufgetreten: {str(e)}"
     finally:
         # Schritt 4: Aufräumen
@@ -221,3 +222,4 @@ with gr.Blocks(css=css, theme=gr.themes.Base()) as demo:
 
 if __name__ == "__main__":
     demo.launch(server_name="0.0.0.0", server_port=7860)
+
