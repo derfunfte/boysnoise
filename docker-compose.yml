@@ -1,4 +1,4 @@
-## Optimiertes Dockerfile für die Entwicklung
+# Optimiertes Dockerfile für die Entwicklung
 
 # Verwenden Sie das offizielle Coqui TTS Image als Basis.
 # Eine feste Version sorgt für reproduzierbare Builds.
