@@ -1,0 +1,11 @@
+FROM coqui/tts:latest
+
+# Wir setzen das Arbeitsverzeichnis
+WORKDIR /app
+
+# Optional: Zusätzliche Abhängigkeiten installieren, falls benötigt
+# RUN apt-get update && apt-get install -y some-package
+
+# Standardbefehl, wenn der Container startet
+# Wir lassen dies leer, da wir die Befehle manuell im Gitpod-Terminal ausführen wollen
+CMD ["/bin/bash"]
