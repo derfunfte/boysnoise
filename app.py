@@ -1,16 +1,36 @@
-# ...
-      # Starte die GUI im Hintergrund, damit der Terminal frei bleibt
-      python /workspace/boysnoise/app.py &
-# ...
-import gradio as gr
-import subprocess
+# Standard library imports
+import logging
 import os
-import time
 import shlex
+import subprocess
+import time
+
+# Third-party imports
+import gradio as gr
 
 # Verzeichnis für generierte Audiodateien, falls es nicht existiert
 output_dir = "/workspace/trainings_output"
 os.makedirs(output_dir, exist_ok=True)
+
+# Konfiguriere grundlegendes Logging
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+# Konstanten auf Modulebene definieren
+# Sprachen-Mapping für den language_idx Parameter des xtts_v2 Modells.
+# Unterstützte Sprachen: en, es, fr, de, it, pt, pl, tr, ru, nl, cs, ar, zh-cn, ja, hu, ko
+LANG_MAP = {
+    "Deutsch": "de",
+    "Englisch": "en",
+    "Spanisch": "es",
+    "Französisch": "fr",
+    "Italienisch": "it",
+    "Portugiesisch": "pt",
+    "Polnisch": "pl",
+    "Russisch": "ru",
+    "Türkisch": "tr",
+    "Japanisch": "ja",
+    "Chinesisch": "zh-cn"
+}
 
 def synthesize_speech(text, speaker_wav, language):
     """
@@ -26,23 +46,8 @@ def synthesize_speech(text, speaker_wav, language):
     timestamp = int(time.time())
     output_filename = f"output_{timestamp}.wav"
     output_path = os.path.join(output_dir, output_filename)
-    
-    # Sprachen-Mapping für den language_idx Parameter
-    # Das xtts_v2 Modell unterstützt: en, es, fr, de, it, pt, pl, tr, ru, nl, cs, ar, zh-cn, ja, hu, ko
-    lang_map = {
-        "Deutsch": "de",
-        "Englisch": "en",
-        "Spanisch": "es",
-        "Französisch": "fr",
-        "Italienisch": "it",
-        "Portugiesisch": "pt",
-        "Polnisch": "pl",
-        "Russisch": "ru",
-        "Türkisch": "tr",
-        "Japanisch": "ja",
-        "Chinesisch": "zh-cn"
-    }
-    lang_idx = lang_map.get(language, "de") # Standard ist Deutsch, falls etwas schiefgeht
+
+    lang_idx = LANG_MAP.get(language, "de") # Standard ist Deutsch, falls etwas schiefgeht
 
     # Baue den Befehl sicher zusammen
     command = [
@@ -56,7 +61,7 @@ def synthesize_speech(text, speaker_wav, language):
 
     try:
         # Führe den Befehl aus
-        print(f"Führe Kommando aus: {' '.join(shlex.quote(c) for c in command)}")
+        logging.info(f"Executing command: {' '.join(shlex.quote(c) for c in command)}")
         process = subprocess.run(command, check=True, capture_output=True, text=True, encoding='utf-8')
         status_message = f"Synthese erfolgreich abgeschlossen!\n\nLog:\n{process.stdout}\n{process.stderr}"
         return output_path, status_message
@@ -87,7 +92,7 @@ with gr.Blocks(css=css, theme=gr.themes.Base()) as demo:
         with gr.Column(scale=2):
             text_input = gr.Textbox(label="Zu synthetisierender Text", lines=4, placeholder="Schreiben Sie hier den Text...")
             speaker_wav_input = gr.File(label="Referenz-Stimme (WAV-Datei)", file_types=['.wav'])
-            language_input = gr.Dropdown(label="Sprache", choices=list(lang_map.keys()), value="Deutsch")
+            language_input = gr.Dropdown(label="Sprache", choices=list(LANG_MAP.keys()), value="Deutsch")
             generate_button = gr.Button("Stimme generieren")
         with gr.Column(scale=3):
             audio_output = gr.Audio(label="Generierte Sprachausgabe")
