@@ -34,6 +34,12 @@ LANG_MAP = {
 }
 
 def synthesize_speech(text, speaker_wav, language):
+    logging.info(f"Synthesize speech called with text: '{text}', language: '{language}'")
+    if speaker_wav:
+        logging.info(f"Speaker wav path: {speaker_wav.name}")
+    else:
+        logging.info("No speaker wav provided.")
+
     """
     Nimmt Text, eine Referenz-WAV und eine Sprache entgegen,
     ruft Coqui TTS auf und gibt den Pfad zur Audiodatei sowie den Status zurück.
@@ -74,10 +80,11 @@ def synthesize_speech(text, speaker_wav, language):
             "--language_idx", lang_idx, "--out_path", output_path
         ]
         logging.info(f"Executing command: {' '.join(shlex.quote(c) for c in command)}")
-        process = subprocess.run(command, check=True, capture_output=True, text=True, encoding='utf-8', timeout=120)
+        process = subprocess.run(command, check=True, capture_output=True, text=True, encoding='utf-8', timeout=120, input='y')
         
         # Schritt 3: Erfolgreiche Rückgabe
         status_message = f"Synthese erfolgreich abgeschlossen!\n\nLog:\n{process.stdout}\n{process.stderr}"
+        logging.info(f"Synthesis successful. Output path: {output_path}")
         return output_path, status_message
 
     except subprocess.TimeoutExpired as e:
@@ -88,6 +95,7 @@ def synthesize_speech(text, speaker_wav, language):
     except subprocess.CalledProcessError as e:
         context = "Synthese" if "tts" in str(e.cmd) else "Audiokonvertierung (ffmpeg)"
         error_message = f"FEHLER bei der {context}:\n\nExit-Code: {e.returncode}\n\n--- STDOUT ---\n{e.stdout}\n\n--- STDERR ---\n{e.stderr}"
+        logging.error(error_message)
         return None, error_message
     except FileNotFoundError as e:
         error_message = f"FEHLER: Das Programm '{e.filename}' wurde nicht gefunden. Ist es korrekt installiert und im Systempfad?"
