@@ -95,6 +95,12 @@ def synthesize_speech(text, speaker_wav, language):
         return None, error_message
     except Exception as e:
         logging.error(f"Ein unerwarteter Fehler ist aufgetreten: {e}", exc_info=True)
+        with open("error.log", "a") as f:
+            f.write(f"Timestamp: {time.time()}\n")
+            f.write(f"Error: {str(e)}\n")
+            import traceback
+            traceback.print_exc(file=f)
+            f.write("--- END OF ERROR ---")
         return None, f"Ein unerwarteter Fehler ist aufgetreten: {str(e)}"
     finally:
         # Schritt 4: Aufräumen
