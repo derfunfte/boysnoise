@@ -1,20 +1,24 @@
-# Es wird empfohlen, eine spezifische Version zu verwenden, um reproduzierbare Builds zu gewährleisten.
-# Die offiziellen Coqui TTS-Images befinden sich jetzt auf ghcr.io.
+## Optimiertes Dockerfile für die Entwicklung
+
+# Verwenden Sie das offizielle Coqui TTS Image als Basis.
+# Eine feste Version sorgt für reproduzierbare Builds.
 FROM ghcr.io/coqui-ai/tts:v0.22.0
 
-# Arbeitsverzeichnis im Container festlegen
+# Legen Sie das Arbeitsverzeichnis fest.
 WORKDIR /app
 
-# Optional: Zusätzliche Systemabhängigkeiten installieren.
-# Fügen Sie hier Ihre Pakete hinzu und bereinigen Sie den apt-Cache, um die Image-Größe zu reduzieren.
-# RUN apt-get update && apt-get install -y --no-install-recommends \
-#     some-package \
-#     && rm -rf /var/lib/apt/lists/*
+# (Optional) Installieren Sie zuerst die Abhängigkeiten, um den Docker-Cache zu nutzen.
+# Kopieren Sie nur die Anforderungsdatei.
+COPY requirements.txt .
 
-# Optional: Anwendungsdateien in den Container kopieren
-# COPY . .
+# Installieren Sie die Pakete. Dieser Schritt wird nur dann erneut ausgeführt,
+# wenn sich die requirements.txt ändert.
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Standardbefehl beim Start des Containers.
-# Für die Entwicklung (z.B. in Gitpod) ist eine interaktive Shell nützlich.
-# Für die Produktion würden Sie hier den Befehl zum Starten Ihrer Anwendung angeben.
+# Kopieren Sie nun den restlichen Anwendungscode.
+# Änderungen am Code führen nicht zu einer Neuinstallation der Abhängigkeiten.
+COPY . .
+
+# Standardbefehl für die Entwicklung: eine interaktive Shell.
+# So können Sie den Container betreten und Befehle ausführen.
 CMD ["/bin/bash"]
