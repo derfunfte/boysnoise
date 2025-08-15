@@ -34,81 +34,9 @@ LANG_MAP = {
 }
 
 def synthesize_speech(text, speaker_wav, language):
-    logging.info(f"Synthesize speech called with text: '{text}', language: '{language}'")
-    if speaker_wav:
-        logging.info(f"Speaker wav path: {speaker_wav.name}")
-    else:
-        logging.info("No speaker wav provided.")
-
-    """
-    Nimmt Text, eine Referenz-WAV und eine Sprache entgegen,
-    ruft Coqui TTS auf und gibt den Pfad zur Audiodatei sowie den Status zurück.
-    """
-    if not text or not text.strip():
-        return None, "Fehler: Der Eingabetext darf nicht leer sein."
-    if speaker_wav is None:
-        return None, "Fehler: Bitte laden Sie eine Referenz-Audiodatei hoch."
-
-    speaker_wav_path = speaker_wav.name
-    converted_wav_path = None
-
-    try:
-        # Schritt 1: Audio-Konvertierung (falls notwendig)
-        tts_speaker_path = speaker_wav_path
-        if not speaker_wav_path.lower().endswith('.wav'):
-            logging.info(f"'{os.path.basename(speaker_wav_path)}' ist keine WAV-Datei. Konvertiere zu WAV.")
-            with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as temp_wav:
-                converted_wav_path = temp_wav.name
-
-            ffmpeg_command = [
-                "ffmpeg", "-i", speaker_wav_path,
-                "-ar", "22050", "-ac", "1", "-y", converted_wav_path
-            ]
-            logging.info(f"Führe Konvertierung aus: {' '.join(shlex.quote(c) for c in ffmpeg_command)}")
-            subprocess.run(ffmpeg_command, check=True, capture_output=True, text=True, encoding='utf-8', timeout=30)
-            tts_speaker_path = converted_wav_path
-
-        # Schritt 2: Sprachsynthese
-        timestamp = int(time.time())
-        output_filename = f"output_{timestamp}.wav"
-        output_path = os.path.join(output_dir, output_filename)
-        lang_idx = LANG_MAP.get(language, "de")
-
-        command = [
-            "tts", "--model_name", "tts_models/multilingual/multi-dataset/xtts_v2",
-            "--text", text, "--speaker_wav", tts_speaker_path,
-            "--language_idx", lang_idx, "--out_path", output_path
-        ]
-        logging.info(f"Executing command: {' '.join(shlex.quote(c) for c in command)}")
-        process = subprocess.run(command, check=True, capture_output=True, text=True, encoding='utf-8', timeout=120, input='y')
-        
-        # Schritt 3: Erfolgreiche Rückgabe
-        status_message = f"Synthese erfolgreich abgeschlossen!\n\nLog:\n{process.stdout}\n{process.stderr}"
-        logging.info(f"Synthesis successful. Output path: {output_path}")
-        return output_path, status_message
-
-    except subprocess.TimeoutExpired as e:
-        context = "Synthese" if "tts" in str(e.cmd) else "Audiokonvertierung (ffmpeg)"
-        error_message = f"FEHLER: Der Prozess '{context}' hat das Zeitlimit von {e.timeout} Sekunden überschritten und wurde abgebrochen. Dies kann bei sehr langen Texten oder hoher Systemlast passieren."
-        logging.error(error_message)
-        return None, error_message
-    except subprocess.CalledProcessError as e:
-        context = "Synthese" if "tts" in str(e.cmd) else "Audiokonvertierung (ffmpeg)"
-        error_message = f"FEHLER bei der {context}:\n\nExit-Code: {e.returncode}\n\n--- STDOUT ---\n{e.stdout}\n\n--- STDERR ---\n{e.stderr}"
-        logging.error(error_message)
-        return None, error_message
-    except FileNotFoundError as e:
-        error_message = f"FEHLER: Das Programm '{e.filename}' wurde nicht gefunden. Ist es korrekt installiert und im Systempfad?"
-        logging.error(error_message)
-        return None, error_message
-    except Exception as e:
-        logging.error(f"Ein unerwarteter Fehler ist aufgetreten: {e}", exc_info=True)
-        return None, f"Ein unerwarteter Fehler ist aufgetreten: {str(e)}"
-    finally:
-        # Schritt 4: Aufräumen
-        if converted_wav_path and os.path.exists(converted_wav_path):
-            logging.info(f"Entferne temporäre Datei: {converted_wav_path}")
-            os.remove(converted_wav_path)
+    logging.info("Synthesize speech called (dummy version)")
+    dummy_wav_path = "/workspace/boysnoise/dummy.wav"
+    return dummy_wav_path, "This is a dummy output."
 
 def get_generated_files(for_update=True):
     """
