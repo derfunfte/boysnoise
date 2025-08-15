@@ -116,12 +116,47 @@ def get_generated_files(for_update=True):
         
         if for_update:
             # Gib ein Update-Objekt für die dynamische Aktualisierung zurück
-            return gr.Dropdown.update(choices=choices)
+            return gr.update(choices=choices)
         else:
             # Gib nur die Liste für die initiale Befüllung zurück
             return choices
     except FileNotFoundError:
-        return [] if not for_update else gr.Dropdown.update(choices=[])
+        return [] if not for_update else gr.update(choices=[])
+
+def delete_file(file_to_delete):
+    """
+    Löscht eine ausgewählte Datei aus dem Verlauf und dem Dateisystem.
+    Enthält eine Sicherheitsprüfung, um das Löschen außerhalb des output_dir zu verhindern.
+    """
+    if not file_to_delete:
+        return get_generated_files(), None, "Keine Datei zum Löschen ausgewählt."
+
+    try:
+        # SICHERHEITSPRÜFUNG: Verhindert Path-Traversal-Angriffe.
+        # Stellt sicher, dass die zu löschende Datei sich innerhalb des erlaubten Verzeichnisses befindet.
+        safe_dir = os.path.abspath(output_dir)
+        file_path = os.path.abspath(file_to_delete)
+
+        if not file_path.startswith(safe_dir):
+            error_message = "FEHLER: Löschen außerhalb des erlaubten Verzeichnisses verweigert."
+            logging.warning(f"Sicherheitsverletzungsversuch: Löschen von '{file_path}' wurde blockiert.")
+            return get_generated_files(), None, error_message
+
+        if os.path.exists(file_path):
+            os.remove(file_path)
+            filename = os.path.basename(file_path)
+            success_message = f"Datei '{filename}' erfolgreich gelöscht."
+            logging.info(success_message)
+            # Aktualisiere Dropdown, leere den Audioplayer und zeige Erfolgsmeldung
+            return get_generated_files(), None, success_message
+        else:
+            not_found_message = f"Datei '{os.path.basename(file_path)}' nicht gefunden. Wurde sie bereits gelöscht?"
+            return get_generated_files(), None, not_found_message
+
+    except Exception as e:
+        error_message = f"Ein unerwarteter Fehler ist beim Löschen aufgetreten: {str(e)}"
+        logging.error(error_message, exc_info=True)
+        return get_generated_files(), None, error_message
 
 # Nevo-Techno CSS für das Design
 # Wir importieren eine futuristische Schriftart und definieren ein dunkles Farbschema mit Neon-Akzenten.
@@ -149,12 +184,14 @@ with gr.Blocks(css=css, theme=gr.themes.Base()) as demo:
         with gr.Column(scale=3):
             audio_output = gr.Audio(label="Generierte Sprachausgabe")
             status_output = gr.Textbox(label="Status / Log", lines=10, interactive=False)
-            
-            history_dropdown = gr.Dropdown(
-                label="Verlauf der generierten Dateien (neueste zuerst)",
-                choices=get_generated_files(for_update=False),
-                interactive=True
-            )
+
+            with gr.Row():
+                history_dropdown = gr.Dropdown(
+                    label="Verlauf der generierten Dateien (neueste zuerst)",
+                    choices=get_generated_files(for_update=False),
+                    interactive=True,
+                    scale=4)
+                delete_button = gr.Button("🗑️ Löschen", scale=1)
 
     # Event-Handler für den "Stimme generieren"-Button
     synthesis_event = generate_button.click(
@@ -169,6 +206,12 @@ with gr.Blocks(css=css, theme=gr.themes.Base()) as demo:
 
     # Event-Handler, um eine Datei aus dem Verlauf in den Player zu laden
     history_dropdown.change(fn=lambda x: x, inputs=history_dropdown, outputs=audio_output)
+
+    # Event-Handler für den Löschen-Button
+    delete_button.click(
+        fn=delete_file,
+        inputs=[history_dropdown],
+        outputs=[history_dropdown, audio_output, status_output])
 
 if __name__ == "__main__":
     demo.launch(server_name="0.0.0.0", server_port=7860)
