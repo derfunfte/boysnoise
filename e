@@ -49,13 +49,11 @@ def generate():
     ):
         print(chunk.text, end="")
 
-if __name__ == "__main__":
-    generate()
-
-        ),
-    ]
-    tools = [
-        types.Tool(googleSearch=types.GoogleSearch(
+    ),
+]
+tools = [
+    types.Tool(googleSearch=types.GoogleSearch(
+    )),
         )),
     ]
     generate_content_config = types.GenerateContentConfig(
