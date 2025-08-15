@@ -102,6 +102,27 @@ def synthesize_speech(text, speaker_wav, language):
             logging.info(f"Entferne temporäre Datei: {converted_wav_path}")
             os.remove(converted_wav_path)
 
+def get_generated_files(for_update=True):
+    """
+    Sucht im output_dir nach .wav-Dateien und gibt sie sortiert zurück (neueste zuerst).
+    Kann entweder eine Liste für die initiale Befüllung oder ein Gradio-Update-Objekt zurückgeben.
+    """
+    try:
+        files = [f for f in os.listdir(output_dir) if f.endswith('.wav')]
+        # Sortiere nach Änderungsdatum, neueste zuerst
+        files.sort(key=lambda name: os.path.getmtime(os.path.join(output_dir, name)), reverse=True)
+        # Erstelle (Label, Wert) Paare für das Dropdown
+        choices = [(f, os.path.join(output_dir, f)) for f in files]
+        
+        if for_update:
+            # Gib ein Update-Objekt für die dynamische Aktualisierung zurück
+            return gr.Dropdown.update(choices=choices)
+        else:
+            # Gib nur die Liste für die initiale Befüllung zurück
+            return choices
+    except FileNotFoundError:
+        return [] if not for_update else gr.Dropdown.update(choices=[])
+
 # Nevo-Techno CSS für das Design
 # Wir importieren eine futuristische Schriftart und definieren ein dunkles Farbschema mit Neon-Akzenten.
 css = """
@@ -128,12 +149,26 @@ with gr.Blocks(css=css, theme=gr.themes.Base()) as demo:
         with gr.Column(scale=3):
             audio_output = gr.Audio(label="Generierte Sprachausgabe")
             status_output = gr.Textbox(label="Status / Log", lines=10, interactive=False)
+            
+            history_dropdown = gr.Dropdown(
+                label="Verlauf der generierten Dateien (neueste zuerst)",
+                choices=get_generated_files(for_update=False),
+                interactive=True
+            )
 
-    generate_button.click(
+    # Event-Handler für den "Stimme generieren"-Button
+    synthesis_event = generate_button.click(
         fn=synthesize_speech,
         inputs=[text_input, speaker_wav_input, language_input],
         outputs=[audio_output, status_output]
     )
+
+    # Nach der Synthese, aktualisiere die Verlaufsliste.
+    # .then() stellt sicher, dass dies nach dem Haupt-Click-Event ausgeführt wird.
+    synthesis_event.then(fn=get_generated_files, outputs=history_dropdown)
+
+    # Event-Handler, um eine Datei aus dem Verlauf in den Player zu laden
+    history_dropdown.change(fn=lambda x: x, inputs=history_dropdown, outputs=audio_output)
 
 if __name__ == "__main__":
     demo.launch(server_name="0.0.0.0", server_port=7860)

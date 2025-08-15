@@ -1,11 +1,13 @@
 import unittest
 import os
+import time
 import tempfile
 import subprocess
 from unittest.mock import patch, MagicMock, ANY
 
 # Import the function and variables we need to test from app.py
-from app import synthesize_speech, output_dir, LANG_MAP
+import gradio as gr
+from app import synthesize_speech, output_dir, LANG_MAP, get_generated_files
 
 class TestSynthesizeSpeech(unittest.TestCase):
 
@@ -146,6 +148,58 @@ class TestSynthesizeSpeech(unittest.TestCase):
             "--out_path", ANY # The exact path is dynamic, so we check for its presence
         ]
         mock_subprocess_run.assert_called_with(expected_command_part, check=True, capture_output=True, text=True, encoding='utf-8', timeout=120)
+
+class TestGetGeneratedFiles(unittest.TestCase):
+
+    def setUp(self):
+        """Create a temporary directory and patch app.output_dir for test isolation."""
+        self.temp_dir = tempfile.TemporaryDirectory()
+        # Patch the output_dir in the 'app' module to use our temporary directory
+        self.output_dir_patcher = patch('app.output_dir', self.temp_dir.name)
+        self.output_dir_patcher.start()
+
+    def tearDown(self):
+        """Clean up the patch and the temporary directory."""
+        self.output_dir_patcher.stop()
+        self.temp_dir.cleanup()
+
+    def test_empty_directory(self):
+        """Should return an empty list when the directory contains no .wav files."""
+        open(os.path.join(self.temp_dir.name, "a.txt"), 'w').close()
+        self.assertEqual(get_generated_files(for_update=False), [])
+
+    def test_files_are_found_and_sorted_correctly(self):
+        """Should find .wav files and sort them by modification time (newest first)."""
+        # Create dummy files with controlled modification times to test sorting
+        path1_oldest = os.path.join(self.temp_dir.name, "oldest.wav")
+        open(path1_oldest, 'a').close()
+        time.sleep(0.02)  # Ensure different mtime on all systems
+
+        path2_not_wav = os.path.join(self.temp_dir.name, "ignored_file.txt")
+        open(path2_not_wav, 'a').close()
+        time.sleep(0.02)
+
+        path3_newest = os.path.join(self.temp_dir.name, "newest.wav")
+        open(path3_newest, 'a').close()
+
+        result = get_generated_files(for_update=False)
+
+        # Assert only .wav files are returned and they are sorted correctly
+        self.assertEqual(len(result), 2)
+        self.assertEqual(result[0], ("newest.wav", path3_newest))
+        self.assertEqual(result[1], ("oldest.wav", path1_oldest))
+
+    @patch('app.gr.Dropdown')
+    def test_returns_gradio_update_object(self, mock_dropdown):
+        """Should call gr.Dropdown.update with correct choices when for_update is True."""
+        # Create a dummy file to be found
+        path = os.path.join(self.temp_dir.name, "a.wav")
+        open(path, 'a').close()
+        
+        expected_choices = [("a.wav", path)]
+
+        get_generated_files(for_update=True)
+        mock_dropdown.update.assert_called_once_with(choices=expected_choices)
 
 if __name__ == '__main__':
     unittest.main(verbosity=2)
