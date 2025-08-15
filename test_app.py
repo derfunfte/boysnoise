@@ -250,9 +250,9 @@ class TestGetGeneratedFiles(unittest.TestCase):
         self.assertEqual(result[0], ("newest.wav", path3_newest))
         self.assertEqual(result[1], ("oldest.wav", path1_oldest))
 
-    @patch('app.gr.Dropdown')
-    def test_returns_gradio_update_object(self, mock_dropdown):
-        """Should call gr.Dropdown.update with correct choices when for_update is True."""
+    @patch('app.gr.update')
+    def test_returns_gradio_update_object(self, mock_gr_update):
+        """Should call gr.update with correct choices when for_update is True."""
         # Create a dummy file to be found
         path = os.path.join(self.temp_dir.name, "a.wav")
         open(path, 'a').close()
@@ -260,7 +260,7 @@ class TestGetGeneratedFiles(unittest.TestCase):
         expected_choices = [("a.wav", path)]
 
         get_generated_files(for_update=True)
-        mock_dropdown.update.assert_called_once_with(choices=expected_choices)
+        mock_gr_update.assert_called_once_with(choices=expected_choices)
 
     def test_handles_non_existent_output_dir(self):
         """Should return an empty list if the output directory does not exist."""
@@ -274,9 +274,9 @@ class TestGetGeneratedFiles(unittest.TestCase):
             self.assertEqual(get_generated_files(for_update=False), [])
             
             # Also test the for_update=True path
-            with patch('app.gr.Dropdown') as mock_dropdown:
+            with patch('app.gr.update') as mock_gr_update:
                 get_generated_files(for_update=True)
-                mock_dropdown.update.assert_called_once_with(choices=[])
+                mock_gr_update.assert_called_once_with(choices=[])
 
     @patch('app.os.remove')
     @patch('app.subprocess.run')

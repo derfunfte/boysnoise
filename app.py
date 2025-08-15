@@ -74,7 +74,7 @@ def synthesize_speech(text, speaker_wav, language):
             "--language_idx", lang_idx, "--out_path", output_path
         ]
         logging.info(f"Executing command: {' '.join(shlex.quote(c) for c in command)}")
-        process = subprocess.run(command, check=True, capture_output=True, text=True, encoding='utf-8', timeout=120, input='y')
+        process = subprocess.run(command, check=True, capture_output=True, text=True, encoding='utf-8', timeout=120)
         
         # Schritt 3: Erfolgreiche Rückgabe
         status_message = f"Synthese erfolgreich abgeschlossen!\n\nLog:\n{process.stdout}\n{process.stderr}"
