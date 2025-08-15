@@ -4,11 +4,14 @@ import os
 import shlex
 import subprocess
 import time
+import tempfile
 
 # Third-party imports
 import gradio as gr
 
 # Verzeichnis für generierte Audiodateien, falls es nicht existiert
+# Erstelle das Verzeichnis für generierte Audiodateien, falls es nicht existiert
+
 output_dir = "/workspace/trainings_output"
 os.makedirs(output_dir, exist_ok=True)
 
@@ -42,34 +45,56 @@ def synthesize_speech(text, speaker_wav, language):
     if speaker_wav is None:
         return None, "Fehler: Bitte laden Sie eine Referenz-WAV-Datei hoch."
 
-    # Generiere einen einzigartigen Dateinamen, um Überschreibungen zu vermeiden
-    timestamp = int(time.time())
-    output_filename = f"output_{timestamp}.wav"
-    output_path = os.path.join(output_dir, output_filename)
-
-    lang_idx = LANG_MAP.get(language, "de") # Standard ist Deutsch, falls etwas schiefgeht
-
-    # Baue den Befehl sicher zusammen
-    command = [
-        "tts",
-        "--model_name", "tts_models/multilingual/multi-dataset/xtts_v2",
-        "--text", text,
-        "--speaker_wav", speaker_wav.name, # .name gibt den temporären Pfad der hochgeladenen Datei an
-        "--language_idx", lang_idx,
-        "--out_path", output_path
-    ]
+    speaker_wav_path = speaker_wav.name
+    converted_wav_path = None
 
     try:
-        # Führe den Befehl aus
+        # Wenn die Eingabedatei keine WAV-Datei ist, konvertiere sie mit ffmpeg
+        if not speaker_wav_path.lower().endswith('.wav'):
+            logging.info(f"'{os.path.basename(speaker_wav_path)}' ist keine WAV-Datei. Konvertiere zu WAV.")
+            
+            # Erstelle eine temporäre Datei für die konvertierte Ausgabe
+            with tempfile.NamedTemporaryFile(suffix=".wav", delete=False) as temp_wav:
+                converted_wav_path = temp_wav.name
+            
+            ffmpeg_command = ["ffmpeg", "-i", speaker_wav_path, "-y", converted_wav_path]
+            logging.info(f"Führe Konvertierung aus: {' '.join(shlex.quote(c) for c in ffmpeg_command)}")
+            
+            try:
+                subprocess.run(ffmpeg_command, check=True, capture_output=True, text=True, encoding='utf-8')
+                tts_speaker_path = converted_wav_path
+            except subprocess.CalledProcessError as e:
+                error_message = f"FEHLER bei der Audiokonvertierung (ffmpeg):\n\nExit-Code: {e.returncode}\n\n--- STDERR ---\n{e.stderr}"
+                return None, error_message
+        else:
+            tts_speaker_path = speaker_wav_path
+
+        # Generiere einen einzigartigen Dateinamen für die Ausgabe
+        timestamp = int(time.time())
+        output_filename = f"output_{timestamp}.wav"
+        output_path = os.path.join(output_dir, output_filename)
+        lang_idx = LANG_MAP.get(language, "de")
+
+        # Baue den TTS-Befehl sicher zusammen
+        command = [
+            "tts",
+            "--model_name", "tts_models/multilingual/multi-dataset/xtts_v2",
+            "--text", text,
+            "--speaker_wav", tts_speaker_path,
+            "--language_idx", lang_idx,
+            "--out_path", output_path
+        ]
+
         logging.info(f"Executing command: {' '.join(shlex.quote(c) for c in command)}")
         process = subprocess.run(command, check=True, capture_output=True, text=True, encoding='utf-8')
         status_message = f"Synthese erfolgreich abgeschlossen!\n\nLog:\n{process.stdout}\n{process.stderr}"
         return output_path, status_message
-    except subprocess.CalledProcessError as e:
-        error_message = f"FEHLER bei der Synthese:\n\nExit-Code: {e.returncode}\n\n--- STDOUT ---\n{e.stdout}\n\n--- STDERR ---\n{e.stderr}"
-        return None, error_message
-    except Exception as e:
-        return None, f"Ein unerwarteter Fehler ist aufgetreten: {str(e)}"
+
+    finally:
+        # Räume die temporär konvertierte Datei auf, falls eine erstellt wurde
+        if converted_wav_path and os.path.exists(converted_wav_path):
+            logging.info(f"Entferne temporäre Datei: {converted_wav_path}")
+            os.remove(converted_wav_path)
 
 # Nevo-Techno CSS für das Design
 # Wir importieren eine futuristische Schriftart und definieren ein dunkles Farbschema mit Neon-Akzenten.
@@ -91,7 +116,7 @@ with gr.Blocks(css=css, theme=gr.themes.Base()) as demo:
     with gr.Row():
         with gr.Column(scale=2):
             text_input = gr.Textbox(label="Zu synthetisierender Text", lines=4, placeholder="Schreiben Sie hier den Text...")
-            speaker_wav_input = gr.File(label="Referenz-Stimme (WAV-Datei)", file_types=['.wav'])
+            speaker_wav_input = gr.File(label="Referenz-Stimme (beliebige Audiodatei)", file_types=['audio'])
             language_input = gr.Dropdown(label="Sprache", choices=list(LANG_MAP.keys()), value="Deutsch")
             generate_button = gr.Button("Stimme generieren")
         with gr.Column(scale=3):
