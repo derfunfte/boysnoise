@@ -1,16 +1,11 @@
-version: '3.9'
+FROM coqui/tts:latest
 
-services:
-  xtts-webui:
-    # Wir nutzen ein aktuelles und gut gepflegtes Image
-    image: ghcr.io/coqui-ai/tts-webui:latest
-    container_name: xtts_service
-    ports:
-      # Wir mappen den internen Port des Containers auf den Host-Port
-      - "7860:7860"
-    volumes:
-      # Wir erstellen Volumes, um unsere Modelle und Audio-Outputs persistent zu speichern
-      - ./models:/app/models
-      - ./outputs:/app/outputs
-    # WICHTIG für Gitpod: Docker benötigt erweiterte Rechte im Workspace
-    privileged: true
+# Wir setzen das Arbeitsverzeichnis
+WORKDIR /app
+
+# Optional: Zusätzliche Abhängigkeiten installieren, falls benötigt
+# RUN apt-get update && apt-get install -y some-package
+
+# Standardbefehl, wenn der Container startet
+# Wir lassen dies leer, da wir die Befehle manuell im Gitpod-Terminal ausführen wollen
+CMD ["/bin/bash"]
