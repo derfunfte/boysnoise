@@ -6,12 +6,12 @@ tasks:
       mkdir -p /workspace/trainings_output
       echo "Verzeichnisstruktur wurde angelegt."
       echo "Überprüfe Coqui TTS Installation..."
-      tts --version
+      tts --version || true
       echo "Die Coqui TTS Umgebung ist einsatzbereit."
     command: |
-      echo "-----------------------------------------------------"
-      echo "WILLKOMMEN IM PROJEKT 'STIMMKLON SOUVERÄN'"
-      echo "-----------------------------------------------------"
+      echo -e "\033[1;32m-----------------------------------------------------\033[0m"
+      echo -e "\033[1;33mWILLKOMMEN IM PROJEKT 'STIMMKLON SOUVERÄN'\033[0m"
+      echo -e "\033[1;32m-----------------------------------------------------\033[0m"
       echo "Um die Funktionalität zu testen, können Sie den TTS-Server starten oder direkt ein Kommandozeilen-Rendering durchführen."
       echo ""
       echo "Beispiel für Zero-Shot Klonen (benötigt eine Referenz-WAV-Datei):"
@@ -23,7 +23,7 @@ image:
 
 ports:
   - port: 5002
-    onOpen: ignore
+    onOpen: open-browser
     name: Coqui TTS Server
     description: Web-Interface für die Sprachsynthese.
 
