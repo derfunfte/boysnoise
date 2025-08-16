@@ -2,82 +2,210 @@ import gradio as gr
 import subprocess
 import os
 import tempfile
-import uuid
+import time
+import sys
+from pathlib import Path
 
-# Hilfsfunktion: Beliebige Audiodateien in WAV konvertieren
-def convert_audio_to_wav(input_path: str) -> str:
-    """
-    Konvertiert eine Audio-Datei in 22.05 kHz Mono WAV mit ffmpeg.
-    Gibt den Pfad zur konvertierten Datei zurück.
-    """
-    wav_path = os.path.join(tempfile.gettempdir(), f"{uuid.uuid4()}.wav")
+# --- Konfiguration ---
+output_dir = Path("generierte_stimmen")
+output_dir.mkdir(exist_ok=True)
+
+LANG_MAP = {
+    "Deutsch": "de", "Englisch": "en", "Spanisch": "es", "Französisch": "fr",
+    "Italienisch": "it", "Portugiesisch": "pt", "Polnisch": "pl", "Türkisch": "tr",
+    "Russisch": "ru", "Niederländisch": "nl", "Tschechisch": "cs", "Arabisch": "ar",
+    "Chinesisch": "zh-cn", "Japanisch": "ja", "Ungarisch": "hu", "Koreanisch": "ko"
+}
+LANG_CHOICES = list(LANG_MAP.keys())
+
+# --- Logging in die GUI ---
+class Stream:
+    """Leitet stdout/stderr zu einem Gradio Textbox-Element um."""
+    def __init__(self, textbox):
+        self.textbox = textbox
+        self.value = ""
+
+    def write(self, text):
+        self.value += text
+        self.textbox.update(value=self.value)
+        time.sleep(0.01) # Kleine Verzögerung für Gradio
+
+    def flush(self):
+        pass
+
+# --- Hilfsfunktionen ---
+
+def get_generated_files(for_update: bool = False):
+    """Listet die generierten WAV-Dateien auf, sortiert nach Änderungsdatum."""
     try:
-        result = subprocess.run(
-            ["ffmpeg", "-i", input_path, "-ar", "22050", "-ac", "1", wav_path, "-y"],
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
-            check=True
+        files = [f for f in output_dir.glob("*.wav")]
+        files.sort(key=lambda x: x.stat().st_mtime, reverse=True)
+        choices = [(f.name, str(f)) for f in files]
+    except FileNotFoundError:
+        choices = []
+    
+    if for_update:
+        return gr.update(choices=choices, value=None)
+    return choices
+
+def convert_audio(input_path: str, process_name: str, timeout: int = 30) -> str:
+    """Konvertiert eine Audio-Datei in 22.05 kHz Mono WAV mit ffmpeg."""
+    converted_path = Path(tempfile.gettempdir()) / f"{Path(input_path).stem}_converted.wav"
+    
+    command = [
+        "ffmpeg", "-i", str(input_path), 
+        "-ar", "22050", "-ac", "1", 
+        str(converted_path), "-y"
+    ]
+    
+    try:
+        subprocess.run(
+            command, check=True, capture_output=True, 
+            text=True, encoding='utf-8', timeout=timeout
         )
-        return wav_path
+        return str(converted_path)
+    except FileNotFoundError:
+        raise FileNotFoundError("FEHLER: 'ffmpeg' wurde nicht gefunden. Bitte stellen Sie sicher, dass es installiert ist.")
+    except subprocess.TimeoutExpired:
+        raise TimeoutError(f"FEHLER: '{process_name}' hat das Zeitlimit überschritten.")
     except subprocess.CalledProcessError as e:
-        raise RuntimeError(f"Audio-Konvertierung fehlgeschlagen: {e.stderr.decode()}")
+        raise RuntimeError(f"FEHLER bei der Audiokonvertierung (ffmpeg):\nExit-Code: {e.returncode}\nFehler: {e.stderr}")
 
-# Hauptfunktion: TTS-Ausgabe erzeugen
-def generate_tts(text: str, language: str, speaker_file):
-    """
-    Erzeugt TTS-Ausgabe mit Coqui XTTSv2, unter Verwendung einer Referenzstimme.
-    """
+class SecurityException(Exception):
+    pass
+
+def delete_file(file_to_delete_path: str):
+    """Löscht eine ausgewählte generierte Datei sicher."""
+    if not file_to_delete_path:
+        return get_generated_files(for_update=True), None, "⚠️ Keine Datei zum Löschen ausgewählt."
     try:
-        if not text.strip():
-            return None, None, "⚠️ Kein Text eingegeben."
-        if not speaker_file:
-            return None, None, "⚠️ Keine Referenz-Stimme hochgeladen."
+        safe_path = Path(file_to_delete_path).resolve()
+        if output_dir.resolve() not in safe_path.parents:
+            raise SecurityException(f"Sicherheitswarnung: Löschen außerhalb des erlaubten Verzeichnisses '{output_dir}' verweigert.")
+        safe_path.unlink(missing_ok=False)
+        status_message = f"🗑️ Datei '{safe_path.name}' erfolgreich gelöscht."
+        return get_generated_files(for_update=True), None, status_message
+    except (FileNotFoundError, SecurityException) as e:
+        return get_generated_files(for_update=True), None, f"❌ Fehler: {e}"
+    except Exception as e:
+        return get_generated_files(for_update=True), None, f"❌ Ein unerwarteter Fehler ist beim Löschen aufgetreten: {e}"
 
-        # Falls nötig, Audio in WAV konvertieren
+# --- Hauptlogik ---
+
+def generate_tts(text: str, language: str, speaker_file):
+    """Erzeugt TTS-Ausgabe, verarbeitet Fehler und gibt detailliertes Feedback."""
+    temp_files_to_clean = []
+    audio_output = None
+    status_message = ""
+
+    try:
+        print("Starte TTS-Generierung...")
+        if not text or not text.strip():
+            status_message = "⚠️ Der Eingabetext ist leer."
+            print(status_message)
+            return None, get_generated_files(for_update=True), status_message
+        
+        if speaker_file is None:
+            status_message = "⚠️ Es wurde keine Referenz-Audiodatei hochgeladen."
+            print(status_message)
+            return None, get_generated_files(for_update=True), status_message
+
         speaker_path = speaker_file.name
+        print(f"Referenzdatei: {speaker_path}")
+        
         if not speaker_path.lower().endswith(".wav"):
-            speaker_path = convert_audio_to_wav(speaker_path)
+            print("Konvertiere Audio in das WAV-Format...")
+            converted_speaker_path = convert_audio(speaker_path, "Audiokonvertierung (ffmpeg)")
+            temp_files_to_clean.append(converted_speaker_path)
+            speaker_path = converted_speaker_path
+            print(f"Konvertierung abgeschlossen: {speaker_path}")
 
-        # Ziel-Datei im temporären Verzeichnis
-        output_path = os.path.join(tempfile.gettempdir(), f"{uuid.uuid4()}.wav")
-
-        # TTS-Befehl zusammenstellen
-        cmd = [
+        lang_idx = LANG_MAP.get(language, "de")
+        timestamp = time.strftime("%Y%m%d-%H%M%S")
+        output_filename = f"output_{timestamp}.wav"
+        output_path = output_dir / output_filename
+        
+        command = [
             "tts",
             "--model_name", "tts_models/multilingual/multi-dataset/xtts_v2",
             "--text", text,
             "--speaker_wav", speaker_path,
-            "--language_idx", language,
-            "--out_path", output_path
+            "--language_idx", lang_idx,
+            "--out_path", str(output_path)
         ]
-
-        # TTS ausführen
-        result = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-
-        if result.returncode != 0:
-            return None, None, f"❌ TTS-Fehler:\n{result.stderr}"
-
-        return output_path, output_path, "✅ Sprache erfolgreich generiert."
+        
+        print(f"Führe TTS-Befehl aus: {' '.join(command)}")
+        subprocess.run(
+            command, check=True, capture_output=True, 
+            text=True, encoding='utf-8', timeout=300
+        )
+        print("TTS-Prozess erfolgreich abgeschlossen.")
+        
+        audio_output = str(output_path)
+        status_message = f"✅ Sprache erfolgreich generiert: {output_filename}"
+        
     except Exception as e:
-        return None, None, f"❌ Unerwarteter Fehler: {str(e)}"
+        status_message = f"❌ Ein Fehler ist aufgetreten: {e}"
+        print(status_message)
+        audio_output = None
+        
+    finally:
+        for temp_file in temp_files_to_clean:
+            try:
+                os.remove(temp_file)
+                print(f"Temporäre Datei gelöscht: {temp_file}")
+            except OSError as e:
+                print(f"Fehler beim Löschen der temporären Datei {temp_file}: {e}")
+    
+    return audio_output, get_generated_files(for_update=True), status_message
 
-# Gradio UI
-with gr.Blocks(theme=gr.themes.Soft()) as demo:
-    gr.Markdown("# 🎤 Stimmklon Souverän – Nevo-Techno Voice Cloning")
-    gr.Markdown("Laden Sie eine Referenzstimme hoch und erzeugen Sie synthetische Sprache mit Coqui TTS.")
+# --- Gradio GUI erstellen ---
 
-    with gr.Row():
-        text_input = gr.Textbox(label="Text", value="Willkommen! Laden Sie eine Referenzstimme hoch und erzeugen Sie synthetische Sprache mit Coqui TTS.")
-        lang_input = gr.Textbox(label="Sprache (z. B. de, en, fr)", value="de")
+with gr.Blocks(title="Voice Cloning & TTS App") as demo:
+    gr.Markdown("# 🗣️ Voice Cloning mit TTS")
+    
+    with gr.Tab("Sprache generieren"):
+        with gr.Row():
+            text_input = gr.Textbox(label="Text für die Sprachausgabe", lines=5, placeholder="Geben Sie hier den Text ein...")
+            lang_input = gr.Dropdown(
+                label="Sprache",
+                choices=LANG_CHOICES,
+                value="Deutsch",
+                interactive=True
+            )
+        
+        with gr.Row():
+            speaker_wav_input = gr.Audio(type="file", label="Referenz-Sprachdatei hochladen (.wav, .mp3, etc.)")
+            audio_output = gr.Audio(label="Generierte Sprachausgabe", interactive=False)
+        
+        with gr.Row():
+            generate_btn = gr.Button("🎯 Sprache generieren")
 
-    speaker_wav_input = gr.File(label="Referenz-Stimme (beliebige Audiodatei)", file_types=["audio"], type="file")
+    with gr.Tab("Generierte Dateien verwalten"):
+        gr.Markdown("### Generierte Dateien abspielen oder löschen")
+        with gr.Row():
+            file_output = gr.Dropdown(label="Verfügbare Dateien", choices=get_generated_files())
+            delete_btn = gr.Button("🗑️ Datei löschen")
+        
+        delete_btn.click(
+            fn=delete_file,
+            inputs=[file_output],
+            outputs=[file_output, audio_output, gr.Textbox(visible=True)]
+        )
 
-    with gr.Row():
-        audio_output = gr.Audio(label="TTS-Ausgabe")
-        file_output = gr.File(label="Download generierte Datei")
-    status_output = gr.Textbox(label="Status / Log")
+    gr.Markdown("---")
+    status_output = gr.Textbox(label="Status & Logs", interactive=False, lines=10)
 
-    btn = gr.Button("🎯 Sprache generieren")
-    btn.click(generate_tts, inputs=[text_input, lang_input, speaker_wav_input], outputs=[audio_output, file_output, status_output])
+    # Leite stdout und stderr auf das Status-Textbox-Element um
+    sys.stdout = Stream(status_output)
+    sys.stderr = Stream(status_output)
+    print("Anwendung gestartet. Bitte geben Sie Text, Referenz-Audio und Sprache ein.")
+
+    # Aktionen zuordnen
+    generate_btn.click(
+        fn=generate_tts,
+        inputs=[text_input, lang_input, speaker_wav_input],
+        outputs=[audio_output, file_output, status_output]
+    )
 
 demo.launch(server_name="0.0.0.0", server_port=7860)
