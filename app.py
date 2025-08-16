@@ -23,7 +23,7 @@ def convert_audio_to_wav(input_path: str) -> str:
         raise RuntimeError(f"Audio-Konvertierung fehlgeschlagen: {e.stderr.decode()}")
 
 # Hauptfunktion: TTS-Ausgabe erzeugen
-def generate_tts(text: str, language: str, speaker_file: str):
+def generate_tts(text: str, language: str, speaker_file):
     """
     Erzeugt TTS-Ausgabe mit Coqui XTTSv2, unter Verwendung einer Referenzstimme.
     """
@@ -34,7 +34,7 @@ def generate_tts(text: str, language: str, speaker_file: str):
             return None, None, "⚠️ Keine Referenz-Stimme hochgeladen."
 
         # Falls nötig, Audio in WAV konvertieren
-        speaker_path = speaker_file
+        speaker_path = speaker_file.name
         if not speaker_path.lower().endswith(".wav"):
             speaker_path = convert_audio_to_wav(speaker_path)
 
@@ -70,7 +70,7 @@ with gr.Blocks(theme=gr.themes.Soft()) as demo:
         text_input = gr.Textbox(label="Text", value="Willkommen! Laden Sie eine Referenzstimme hoch und erzeugen Sie synthetische Sprache mit Coqui TTS.")
         lang_input = gr.Textbox(label="Sprache (z. B. de, en, fr)", value="de")
 
-    speaker_wav_input = gr.File(label="Referenz-Stimme (beliebige Audiodatei)", file_types=["audio"], type="filepath")
+    speaker_wav_input = gr.File(label="Referenz-Stimme (beliebige Audiodatei)", file_types=["audio"], type="file")
 
     with gr.Row():
         audio_output = gr.Audio(label="TTS-Ausgabe")
