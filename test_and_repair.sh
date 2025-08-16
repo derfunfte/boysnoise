@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # ==============================================================================
-#  Professionelles Test- und Reparatur-Automatisierungs-Skript (Version 2)
+#  Professionelles Test- und Reparatur-Automatisierungs-Skript (Version 3 - Agentenmodus)
 # ==============================================================================
 
 # --- Konfiguration ---
@@ -16,23 +16,29 @@ log_error() { echo -e "\033[1;31m[ERROR]\033[0m $1"; }
 log_step() { echo -e "\n\033[1;36m--- $1 ---\033[0m"; }
 
 # ==============================================================================
-#  SCHRITT 0: Überprüfung der Werkzeuge (NEU & VERBESSERT)
+#  SCHRITT 0: Überprüfung der Werkzeuge und Konfiguration
 # ==============================================================================
 log_step "SCHRITT 0: Überprüfung der Werkzeug-Verfügbarkeit"
 
-COMMANDS_TO_CHECK=("git" "pytest" "ruff") # 'black' wird durch 'ruff format' ersetzt
-ALL_TOOLS_FOUND=true
+COMMANDS_TO_CHECK=("git" "pytest" "ruff" "curl" "jq" "patch")
+ALL_OK=true
 
 for cmd in "${COMMANDS_TO_CHECK[@]}"; do
     if ! command -v $cmd &> /dev/null; then
         log_error "Werkzeug '$cmd' nicht gefunden. Bitte installieren Sie es."
-        log_error "Für Python-Tools: pip install pytest pytest-cov ruff"
-        ALL_TOOLS_FOUND=false
+        log_error "Für Python-Tools: pip install pytest pytest-cov ruff. Für System-Tools: sudo apt-get install curl jq patch (oder äquivalent)"
+        ALL_OK=false
     fi
 done
 
-if ! $ALL_TOOLS_FOUND; then
-    log_error "Nicht alle benötigten Werkzeuge sind installiert. Skript wird beendet."
+if [ -z "$GEMINI_API_KEY" ]; then
+    log_error "Die Umgebungsvariable GEMINI_API_KEY ist nicht gesetzt."
+    log_error "Bitte holen Sie sich einen Schlüssel von Google AI Studio und setzen Sie ihn: export GEMINI_API_KEY='Ihr_Schlüssel'"
+    ALL_OK=false
+fi
+
+if ! $ALL_OK; then
+    log_error "Voraussetzungen nicht erfüllt. Skript wird beendet."
     exit 1
 else
     log_success "Alle Werkzeuge sind verfügbar."
@@ -101,22 +107,41 @@ while [ $attempt -le $MAX_ATTEMPTS ]; do
         # Extrahiere die fehlerhaften Dateien aus der stderr-Ausgabe von pytest
         FAILING_FILES=$(grep -E "^===+ (FAILURES|ERRORS) ===+$" -A 1000 pytest_errors.log | grep -oP '^\S+\.py' | sort -u)
 
-        if [ -n "$FAILING_FILES" ]; then
-            PROMPT_FILE="ai_repair_prompt.txt"
-            log_success "Generiere detaillierten Reparatur-Prompt in '$PROMPT_FILE'..."
+        if [ -z "$FAILING_FILES" ]; then
+             log_warning "Konnte keine spezifischen fehlerhaften Dateien aus dem Log extrahieren. Überspringe KI-Reparatur."
+             log_error "Die automatische Reparatur konnte nicht alle Fehler beheben, da die Fehlerquelle unklar ist."
+             break
+        fi
 
-            echo "Hello! I am running an automated test and repair script, and the static analysis tools could not fix the errors. Please analyze the following files and error logs and provide a patch to fix the issue." > "$PROMPT_FILE"
-            echo -e "\n--- PYTEST ERROR LOG ---\n" >> "$PROMPT_FILE"
-            cat pytest_errors.log >> "$PROMPT_FILE"
+        PROMPT_FILE="ai_repair_prompt.txt"
+        log_info "Generiere detaillierten Reparatur-Prompt für die KI..."
 
-            for file in $FAILING_FILES; do
-                echo -e "\n--- FILE CONTENT: $file ---\n" >> "$PROMPT_FILE"
-                echo '```python' >> "$PROMPT_FILE"
-                cat "$file" >> "$PROMPT_FILE"
-                echo '```' >> "$PROMPT_FILE"
-            done
-            
-            log_warning "Bitte kopieren Sie den Inhalt von '$PROMPT_FILE' und fügen Sie ihn in Ihren KI-Assistenten ein, um einen Reparaturvorschlag zu erhalten."
+        # System-Prompt für den Agenten
+        SYSTEM_PROMPT="You are an expert software engineer acting as an automated repair agent. Your task is to analyze pytest error logs and the corresponding source code. Your goal is to provide a fix for the failing tests. The fix must be provided ONLY as a single unified diff (a patch file) inside a 'diff' code block. Do not add any explanations before or after the code block."
+
+        # User-Prompt zusammenbauen
+        echo "Hello! The tests for my Python project are failing. Static analysis tools like ruff could not fix the issue. Please analyze the following pytest error log and the content of the failing files and provide a patch to fix the code." > "$PROMPT_FILE"
+        echo -e "\n--- PYTEST ERROR LOG ---\n" >> "$PROMPT_FILE"
+        cat pytest_errors.log >> "$PROMPT_FILE"
+
+        for file in $FAILING_FILES; do
+            echo -e "\n--- FILE CONTENT: $file ---\n" >> "$PROMPT_FILE"
+            echo '```python' >> "$PROMPT_FILE"
+            cat "$file" >> "$PROMPT_FILE"
+            echo '```' >> "$PROMPT_FILE"
+        done
+
+        log_info "Sende Anfrage an die Gemini-API..."
+        API_URL="https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent?key=${GEMINI_API_KEY}"
+        
+        # JSON-Payload für die API erstellen
+        JSON_PAYLOAD=$(jq -n \
+            --arg sp "$SYSTEM_PROMPT" \
+            --arg up "$(cat $PROMPT_FILE)" \
+            '{ "system_instruction": { "parts": [{ "text": $sp }] }, "contents": [{ "parts": [{ "text": $up }] }] }')
+
+        # API-Aufruf mit curl
+        API_RESPONSE=$(curl -s -X POST -H "Content-Type: application
         else
             log_warning "Konnte keine spezifischen fehlerhaften Dateien aus dem Log extrahieren."
         fi
