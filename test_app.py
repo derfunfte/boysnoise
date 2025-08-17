@@ -7,9 +7,9 @@ from unittest.mock import patch, MagicMock, ANY
 
 # Import the function and variables we need to test from app.py
 import gradio as gr
-from app import synthesize_speech, output_dir, LANG_MAP, get_generated_files, delete_file
+from app import generate_tts, output_dir, LANG_MAP, get_generated_files, delete_file
 
-class TestSynthesizeSpeech(unittest.TestCase):
+class TestGenerateTTS(unittest.TestCase):
 
     def setUp(self):
         """Set up a temporary file to act as the speaker_wav input."""
@@ -31,13 +31,13 @@ class TestSynthesizeSpeech(unittest.TestCase):
 
     def test_input_validation_empty_text(self):
         """Should return an error if the input text is empty."""
-        audio_path, status = synthesize_speech("", self.mock_speaker_wav, "Deutsch")
+        audio_path, status = generate_tts("", self.mock_speaker_wav, "Deutsch")
         self.assertIsNone(audio_path)
         self.assertIn("Der Eingabetext darf nicht leer sein", status)
 
     def test_input_validation_no_speaker_file(self):
         """Should return an error if the speaker_wav file is None."""
-        audio_path, status = synthesize_speech("Hallo Welt", None, "Deutsch")
+        audio_path, status = generate_tts("Hallo Welt", None, "Deutsch")
         self.assertIsNone(audio_path)
         self.assertIn("Bitte laden Sie eine Referenz-Audiodatei hoch", status)
 
@@ -50,7 +50,7 @@ class TestSynthesizeSpeech(unittest.TestCase):
         mock_process.stderr = ""
         mock_subprocess_run.return_value = mock_process
 
-        audio_path, status = synthesize_speech("Dies ist ein Test", self.mock_speaker_wav, "Deutsch")
+        audio_path, status = generate_tts("Dies ist ein Test", self.mock_speaker_wav, "Deutsch")
 
         # Assert that subprocess.run was called once
         mock_subprocess_run.assert_called_once()
@@ -75,7 +75,7 @@ class TestSynthesizeSpeech(unittest.TestCase):
             stderr="A critical error occurred in the model loader."
         )
 
-        audio_path, status = synthesize_speech("Dieser Test wird fehlschlagen", self.mock_speaker_wav, "Deutsch")
+        audio_path, status = generate_tts("Dieser Test wird fehlschlagen", self.mock_speaker_wav, "Deutsch")
 
         # Assert that no audio path is returned
         self.assertIsNone(audio_path)
@@ -95,7 +95,7 @@ class TestSynthesizeSpeech(unittest.TestCase):
             timeout=120
         )
 
-        audio_path, status = synthesize_speech("Dieser Text ist sehr, sehr lang.", self.mock_speaker_wav, "Deutsch")
+        audio_path, status = generate_tts("Dieser Text ist sehr, sehr lang.", self.mock_speaker_wav, "Deutsch")
 
         # Assert that no audio path is returned
         self.assertIsNone(audio_path)
@@ -108,7 +108,7 @@ class TestSynthesizeSpeech(unittest.TestCase):
         """Should return a specific error if the tts executable is not found."""
         mock_subprocess_run.side_effect = FileNotFoundError(2, "No such file or directory", "tts")
 
-        audio_path, status = synthesize_speech("Test", self.mock_speaker_wav, "Deutsch")
+        audio_path, status = generate_tts("Test", self.mock_speaker_wav, "Deutsch")
 
         self.assertIsNone(audio_path)
         self.assertIn("FEHLER: Das Programm 'tts' wurde nicht gefunden.", status)
@@ -125,7 +125,7 @@ class TestSynthesizeSpeech(unittest.TestCase):
         mock_subprocess_run.side_effect = FileNotFoundError(2, "No such file or directory", "ffmpeg")
 
         try:
-            audio_path, status = synthesize_speech("Test", mock_mp3_input, "Deutsch")
+            audio_path, status = generate_tts("Test", mock_mp3_input, "Deutsch")
             self.assertIsNone(audio_path)
             self.assertIn("FEHLER: Das Programm 'ffmpeg' wurde nicht gefunden.", status)
         finally:
@@ -147,7 +147,7 @@ class TestSynthesizeSpeech(unittest.TestCase):
         )
 
         try:
-            audio_path, status = synthesize_speech("Test", mock_mp3_input, "Deutsch")
+            audio_path, status = generate_tts("Test", mock_mp3_input, "Deutsch")
             self.assertIsNone(audio_path)
             self.assertIn("FEHLER bei der Audiokonvertierung (ffmpeg)", status)
             self.assertIn("Invalid data found when processing input", status)
@@ -159,7 +159,7 @@ class TestSynthesizeSpeech(unittest.TestCase):
         """Should handle generic exceptions gracefully."""
         mock_subprocess_run.side_effect = Exception("A very unexpected error")
 
-        audio_path, status = synthesize_speech("Test", self.mock_speaker_wav, "Deutsch")
+        audio_path, status = generate_tts("Test", self.mock_speaker_wav, "Deutsch")
 
         self.assertIsNone(audio_path)
         self.assertIn("Ein unerwarteter Fehler ist aufgetreten: A very unexpected error", status)
@@ -181,7 +181,7 @@ class TestSynthesizeSpeech(unittest.TestCase):
         )
 
         try:
-            audio_path, status = synthesize_speech("Test", mock_mp3_input, "Deutsch")
+            audio_path, status = generate_tts("Test", mock_mp3_input, "Deutsch")
             self.assertIsNone(audio_path)
             self.assertIn("FEHLER: Der Prozess 'Audiokonvertierung (ffmpeg)' hat das Zeitlimit von 30 Sekunden überschritten", status)
         finally:
@@ -197,7 +197,7 @@ class TestSynthesizeSpeech(unittest.TestCase):
         test_language = "Japanisch"
         expected_lang_idx = LANG_MAP[test_language] # "ja"
 
-        synthesize_speech(test_text, self.mock_speaker_wav, test_language)
+        generate_tts(test_text, self.mock_speaker_wav, test_language)
 
         # Check that subprocess.run was called with the correctly constructed command
         expected_command_parts = [
@@ -288,7 +288,7 @@ class TestGetGeneratedFiles(unittest.TestCase):
         mock_mp3_input.name = mp3_path
 
         mock_subprocess_run.side_effect = [MagicMock(), subprocess.CalledProcessError(1, "tts")]
-        synthesize_speech("Test", mock_mp3_input, "Deutsch")
+        generate_tts("Test", mock_mp3_input, "Deutsch")
         mock_os_remove.assert_called_once()
         os.remove(mp3_path)  # Clean up the test input file
 

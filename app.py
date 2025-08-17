@@ -18,19 +18,7 @@ LANG_MAP = {
 }
 LANG_CHOICES = list(LANG_MAP.keys())
 
-# --- Logging in die GUI ---
-class Stream:
-    def __init__(self, textbox):
-        self.textbox = textbox
-        self.value = ""
 
-    def write(self, text):
-        self.value += text
-        self.textbox.update(value=self.value)
-        time.sleep(0.01) # Kleine Verzögerung für Gradio
-
-    def flush(self):
-        pass
 
 # --- Hilfsfunktionen ---
 
@@ -108,28 +96,26 @@ def generate_tts(text: str, language: str, speaker_file):
     status_message = ""
 
     try:
-        print("Starte TTS-Generierung...")
+        status_message += "Starte TTS-Generierung...\n"
         # 1. Eingabe validieren
         if not text or not text.strip():
-            status_message = "⚠️ Der Eingabetext ist leer."
-            print(status_message)
+            status_message += "⚠️ Der Eingabetext ist leer.\n"
             return None, get_generated_files(for_update=True), status_message
         
         if speaker_file is None:
-            status_message = "⚠️ Es wurde keine Referenz-Audiodatei hochgeladen."
-            print(status_message)
+            status_message += "⚠️ Es wurde keine Referenz-Audiodatei hochgeladen.\n"
             return None, get_generated_files(for_update=True), status_message
 
-        speaker_path = speaker_file.name
-        print(f"Referenzdatei: {speaker_path}")
+        speaker_path = speaker_file
+        status_message += f"Referenzdatei: {speaker_path}\n"
         
         # 2. Audio bei Bedarf konvertieren
         if not speaker_path.lower().endswith(".wav"):
-            print("Konvertiere Audio in das WAV-Format...")
+            status_message += "Konvertiere Audio in das WAV-Format...\n"
             converted_speaker_path = convert_audio(speaker_path, "Audiokonvertierung (ffmpeg)")
             temp_files_to_clean.append(converted_speaker_path)
             speaker_path = converted_speaker_path
-            print(f"Konvertierung abgeschlossen: {speaker_path}")
+            status_message += f"Konvertierung abgeschlossen: {speaker_path}\n"
 
         # 3. TTS-Befehl ausführen
         lang_idx = LANG_MAP.get(language, "de")
@@ -146,19 +132,20 @@ def generate_tts(text: str, language: str, speaker_file):
             "--out_path", str(output_path)
         ]
         
-        print(f"Führe TTS-Befehl aus: {' '.join(command)}")
+        status_message += f"Führe TTS-Befehl aus: {' '.join(command)}\n"
         process = subprocess.run(
             command, check=True, capture_output=True, 
             text=True, encoding='utf-8', timeout=300 # Erhöhtes Zeitlimit für große Modelle
         )
-        print("TTS-Prozess erfolgreich abgeschlossen.")
+        status_message += "TTS-Prozess erfolgreich abgeschlossen.\n"
+        status_message += f"stdout: {process.stdout}\n"
+        status_message += f"stderr: {process.stderr}\n"
         
         audio_output = str(output_path)
-        status_message = f"✅ Sprache erfolgreich generiert: {output_filename}"
+        status_message += f"✅ Sprache erfolgreich generiert: {output_filename}\n"
         
     except Exception as e:
-        status_message = f"❌ Ein Fehler ist aufgetreten: {e}"
-        print(status_message)
+        status_message += f"❌ Ein Fehler ist aufgetreten: {e}\n"
         audio_output = None
         
     finally:
@@ -166,9 +153,9 @@ def generate_tts(text: str, language: str, speaker_file):
         for temp_file in temp_files_to_clean:
             try:
                 os.remove(temp_file)
-                print(f"Temporäre Datei gelöscht: {temp_file}")
+                status_message += f"Temporäre Datei gelöscht: {temp_file}\n"
             except OSError as e:
-                print(f"Fehler beim Löschen der temporären Datei {temp_file}: {e}")
+                status_message += f"Fehler beim Löschen der temporären Datei {temp_file}: {e}\n"
     
     # Rückgabe in der richtigen Reihenfolge
     return audio_output, get_generated_files(for_update=True), status_message
@@ -189,7 +176,7 @@ with gr.Blocks(title="Voice Cloning & TTS App") as demo:
             )
         
         with gr.Row():
-            speaker_wav_input = gr.Audio(type="file", label="Referenz-Sprachdatei hochladen (.wav, .mp3, etc.)")
+            speaker_wav_input = gr.Audio(type="filepath", label="Referenz-Sprachdatei hochladen (.wav, .mp3, etc.)")
             audio_output = gr.Audio(label="Generierte Sprachausgabe", interactive=False)
         
         with gr.Row():
@@ -204,16 +191,13 @@ with gr.Blocks(title="Voice Cloning & TTS App") as demo:
         delete_btn.click(
             fn=delete_file,
             inputs=[file_output],
-            outputs=[file_output, audio_output, gr.Textbox(visible=True)]
+            outputs=[file_output, audio_output, status_output]
         )
 
     gr.Markdown("---")
     status_output = gr.Textbox(label="Status & Logs", interactive=False, lines=10)
 
-    # Redirect stdout and stderr to the status textbox
-    sys.stdout = Stream(status_output)
-    sys.stderr = Stream(status_output)
-    print("Anwendung gestartet. Bitte geben Sie Text, Referenz-Audio und Sprache ein.")
+    
 
     # Aktionen zuordnen
     generate_btn.click(
