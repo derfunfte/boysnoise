@@ -81,7 +81,7 @@ while [ $attempt -le $MAX_ATTEMPTS ]; do
     echo "  - Fehlgeschlagene Tests: ${FAILED_TESTS:-0}"
     echo "  - Testabdeckung: ${COVERAGE:--}"
 
-    if [ $TEST_EXIT_CODE -eq 0 ]; then
+        if [ $TEST_EXIT_CODE -eq 0 ]; then
         log_success "Alle Tests wurden erfolgreich bestanden!"
         log_step "FINALE BERICHTE"
         cat pytest_results.log
