@@ -188,11 +188,14 @@ with gr.Blocks(title="Voice Cloning & TTS App") as demo:
             file_output = gr.Dropdown(label="Verfügbare Dateien", choices=get_generated_files())
             delete_btn = gr.Button("🗑️ Datei löschen")
         
-        delete_btn.click(
-            fn=delete_file,
-            inputs=[file_output],
-            outputs=[file_output, audio_output, status_output]
-        )
+    gr.Markdown("---")
+    status_output = gr.Textbox(label="Status & Logs", interactive=False, lines=10)
+
+    delete_btn.click(
+        fn=delete_file,
+        inputs=[file_output],
+        outputs=[file_output, audio_output, status_output]
+    )
 
     gr.Markdown("---")
     status_output = gr.Textbox(label="Status & Logs", interactive=False, lines=10)
