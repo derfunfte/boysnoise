@@ -2,6 +2,9 @@
 gradio
 TTS
 pytest
+torch
+scipy
+numpy
 
 # System dependencies (install via apt-get, etc.)
-# ffmpeg
+ffmpeg
