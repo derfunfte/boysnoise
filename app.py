@@ -112,10 +112,11 @@ def generate_tts(text: str, language: str, speaker_file):
     temp_files_to_clean = []
     audio_output = None
     status_message = ""
+    print(f"PyTorch Version: {torch.__version__}")
 
     try:
         os.environ["COQUI_TOS_AGREED"] = "1"
-        torch.serialization.add_safe_globals([XttsConfig])
+        torch.serialization.add_safe_globals([XttsConfig, XttsAudioConfig])
         status_message += "Starte TTS-Generierung...\n"
         # 1. Eingabe validieren
         if not text or not text.strip():
