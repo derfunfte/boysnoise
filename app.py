@@ -101,10 +101,14 @@ def delete_file(file_to_delete_path: str):
 
 # --- Hauptlogik ---
 
+# Global TTS model instance
+tts_model = None
+
 def generate_tts(text: str, language: str, speaker_file):
     """
     Erzeugt TTS-Ausgabe, verarbeitet Fehler und gibt detailliertes Feedback.
     """
+    global tts_model # Declare tts_model as global
     temp_files_to_clean = []
     audio_output = None
     status_message = ""
@@ -133,39 +137,30 @@ def generate_tts(text: str, language: str, speaker_file):
             speaker_path = converted_speaker_path
             status_message += f"Konvertierung abgeschlossen: {speaker_path}\n"
 
-        # 3. TTS-Befehl ausführen
+        # Initialize TTS model if not already initialized
+        if tts_model is None:
+            status_message += f"Lade TTS-Modell: {tts_model_name}...\n"
+            tts_model = TTS(model_name=tts_model_name)
+            status_message += "TTS-Modell geladen.\n"
+
+        # 3. TTS-Generierung direkt über die Bibliothek
         lang_idx = LANG_MAP.get(language, "de")
         timestamp = time.strftime("%Y%m%d-%H%M%S")
         output_filename = f"output_{timestamp}.wav"
         output_path = output_dir / output_filename
         
-        command = [
-            "tts",
-            "--model_name", tts_model_name,
-            "--text", text,
-            "--speaker_wav", speaker_path,
-            "--language_idx", lang_idx,
-            "--out_path", str(output_path)
-        ]
-        
-        status_message += f"Führe TTS-Befehl aus: {' '.join(command)}\n"
-        process = subprocess.run(
-            command, check=True, capture_output=True, 
-            text=True, encoding='utf-8', timeout=300 # Erhöhtes Zeitlimit für große Modelle
+        status_message += f"Generiere Sprache für Text: '{text[:50]}...' in Sprache: {language}...\n"
+        tts_model.tts_to_file(
+            text=text,
+            speaker_wav=speaker_path,
+            language=lang_idx,
+            file_path=str(output_path)
         )
-        status_message += "TTS-Prozess erfolgreich abgeschlossen.\n"
-        status_message += f"stdout: {process.stdout}\n"
-        status_message += f"stderr: {process.stderr}\n"
         
+        status_message += "TTS-Prozess erfolgreich abgeschlossen.\n"
         audio_output = str(output_path)
         status_message += f"✅ Sprache erfolgreich generiert: {output_filename}\n"
         
-    except subprocess.CalledProcessError as e:
-        status_message += f"❌ Fehler bei der TTS-Generierung:\n"
-        status_message += f"Exit-Code: {e.returncode}\n"
-        status_message += f"stdout: {e.stdout}\n"
-        status_message += f"stderr: {e.stderr}\n"
-        audio_output = None
     except Exception as e:
         status_message += f"❌ Ein unerwarteter Fehler ist aufgetreten: {e}\n"
         audio_output = None
@@ -181,6 +176,7 @@ def generate_tts(text: str, language: str, speaker_file):
     
     # Rückgabe in der richtigen Reihenfolge
     return audio_output, get_generated_files(for_update=True), status_message
+
 
 # --- Gradio GUI erstellen ---
 
