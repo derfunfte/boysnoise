@@ -41,3 +41,7 @@ vscode:
   extensions:
     - ms-python.python
     - ms-toolsai.jupyter
+services:
+  your-service-name:
+    ports:
+      - "54112:54112"
