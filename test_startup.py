@@ -1,0 +1,1 @@
+print("PYTHONSTARTUP script executed!")
