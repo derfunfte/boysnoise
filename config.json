@@ -1,0 +1,4 @@
+{
+  "tts_model": "tts_models/multilingual/multi-dataset/xtts_v2",
+  "output_dir": "generierte_stimmen"
+}

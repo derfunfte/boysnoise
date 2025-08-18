@@ -1,123 +1,25 @@
-import unittest
-import os
-import time
-import tempfile
-import subprocess
-from unittest.mock import patch, MagicMock, ANY
-from pathlib import Path
-
-# Import the function and variables we need to test from app.py
 import gradio as gr
-from app import generate_tts, output_dir, LANG_MAP, get_generated_files, delete_file, convert_audio
-
-class TestGenerateTTS(unittest.TestCase):
-
-    def setUp(self):
-        """Set up a temporary file to act as the speaker_wav input."""
-        self.temp_wav_file = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
-        self.temp_wav_path = self.temp_wav_file.name
-        self.temp_wav_file.close()
-self.temp_wav_file = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
-        self.temp_wav_path = self.temp_wav_file.name
-        self.temp_wav_file.close()
-    @patch('app.convert_audio')
-    @patch('app.subprocess.run')
-    def test_successful_synthesis_with_conversion(self, mock_subprocess_run, mock_convert_audio):
-        """Should convert non-wav speaker file and then synthesize."""
-        # Create a dummy non-wav file
-        temp_mp3_file = tempfile.NamedTemporaryFile(suffix=".mp3", delete=False)
-        temp_mp3_path = temp_mp3_file.name
-        temp_mp3_file.close()
-
-        mock_convert_audio.return_value = self.temp_wav_path # Simulate successful conversion
-        mock_subprocess_run.return_value = MagicMock(stdout="TTS success", stderr="")
-
-        audio_path, _, status = generate_tts("Test text", "Deutsch", temp_mp3_path)
-
-        mock_convert_audio.assert_called_once_with(temp_mp3_path, "Audiokonvertierung (ffmpeg)")
-        mock_subprocess_run.assert_called_once()
-        self.assertIsNotNone(audio_path)
-        self.assertIn("Sprache erfolgreich generiert", status)
-
-        os.remove(temp_mp3_path) # Clean up dummy mp3
-
-    def tearDown(self):
-        """Clean up the temporary file after each test."""
-        os.remove(self.temp_wav_path)
-        # Clean up any output files created during tests
-        for f in output_dir.glob("output_*.wav"):
-            f.unlink()
-
-    def test_input_validation_empty_text(self):
-        """Should return an error if the input text is empty."""
-        audio_path, _, status = generate_tts("", "Deutsch", self.temp_wav_path)
-        self.assertIsNone(audio_path)
-        self.assertIn("Der Eingabetext ist leer", status)
-
-    def test_input_validation_no_speaker_file(self):
-        """Should return an error if the speaker_wav file is None."""
-        audio_path, _, status = generate_tts("Hallo Welt", "Deutsch", None)
-        self.assertIsNone(audio_path)
-        self.assertIn("Es wurde keine Referenz-Audiodatei hochgeladen", status)
-
-    @patch('app.subprocess.run')
-    def test_successful_synthesis(self, mock_subprocess_run):
-        """Should return the audio path and a success message on successful TTS execution."""
-        # Configure the mock to simulate a successful process run
-        mock_process = MagicMock()
-        mock_process.stdout = "TTS process finished successfully."
-        mock_process.stderr = ""
-        mock_subprocess_run.return_value = mock_process
-
-        audio_path, _, status = generate_tts("Dies ist ein Test", "Deutsch", self.temp_wav_path)
-
-        # Assert that subprocess.run was called once
-        mock_subprocess_run.assert_called_once()
-        
-        # Assert that a valid path within the output directory is returned
-        self.assertIsNotNone(audio_path)
-        self.assertTrue(audio_path.startswith(str(output_dir)))
-        self.assertTrue(audio_path.endswith(".wavself.temp_wav_file = tempfile.NamedTemporaryFile(suffix=".wav", delete=False)
-        self.temp_wav_path = self.temp_wav_file.name
-        self.temp_wav_file.close()
-
-    def tearDown(self):
-        """Clean up the temporary file after each test."""
-        os.remove(self.temp_wav_path)
-        # Clean up any output files created during tests
-        for f in output_dir.glob("output_*.wav"):
-            f.unlink()
-
-    def test_input_validation_empty_text(self):
-        """Should return an error if the input text is empty."""
-        audio_path, _, status = generate_tts("", "Deutsch", self.temp_wav_path)
-        self.assertIsNone(audio_path)
-        self.assertIn("Der Eingabetext ist leer", status)
-
-    def test_input_validation_no_speaker_file(self):
-        """Should return an error if the speaker_wav file is None."""
-        audio_path, _, status = generate_tts("Hallo Welt", "Deutsch", None)
-        self.assertIsNone(audio_path)
-        self.assertIn("Es wurde keine Referenz-Audiodatei hochgeladen", status)
-
-    @patch('app.subprocess.run')
-    def test_successful_synthesis(self, mock_subprocess_run):
-        """Should return the audio path and a success message on successful TTS execution."""
-        # Configure the mock to simulate a successful process run
-        mock_process = MagicMock()
-        mock_process.stdout = "TTS process finished successfully."
-        mock_process.stderr = ""
-        mock_subprocess_run.return_value =import gradio as gr
 import subprocess
 import os
 import tempfile
 import time
 import sys
 from pathlib import Path
+import json
 
 # --- Konfiguration ---
-output_dir = Path("generierte_stimmen")
+try:
+    with open("config.json", "r", encoding="utf-8") as f:
+        config = json.load(f)
+    tts_model = config.get("tts_model", "tts_models/multilingual/multi-dataset/xtts_v2")
+    output_dir_str = config.get("output_dir", "generierte_stimmen")
+except FileNotFoundError:
+    tts_model = "tts_models/multilingual/multi-dataset/xtts_v2"
+    output_dir_str = "generierte_stimmen"
+
+output_dir = Path(output_dir_str)
 output_dir.mkdir(exist_ok=True)
+
 
 LANG_MAP = {
     "Deutsch": "de", "Englisch": "en", "Spanisch": "es", "Französisch": "fr",
@@ -234,11 +136,12 @@ def generate_tts(text: str, language: str, speaker_file):
         
         command = [
             "tts",
-            "--model_name", "tts_models/multilingual/multi-dataset/xtts_v2",
+            "--model_name", tts_model,
             "--text", text,
             "--speaker_wav", speaker_path,
             "--language_idx", lang_idx,
-            "--out_path", str(output_path)
+            "--out_path", str(output_path),
+            "--yes"
         ]
         
         status_message += f"Führe TTS-Befehl aus: {' '.join(command)}\n"

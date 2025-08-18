@@ -1,0 +1,7 @@
+# Python libraries
+gradio
+TTS
+pytest
+
+# System dependencies (install via apt-get, etc.)
+# ffmpeg

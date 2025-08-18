@@ -1,0 +1,37 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+env/
+venv/
+pip-wheel-metadata/
+.coverage
+.pytest_cache/
+
+# Flask
+instance/
+.webassets-cache
+
+# Audio files
+*.wav
+*.opus
+error.log
+
+# Generated voices
+generierte_stimmen/
+
+# Ignore all opus and wav files except the dummy files
+!dummy.wav
+!PTT-20241116-WA0031.opus
+!PTT-20241116-WA0032.opus
+!PTT-20241116-WA0033.opus
+!PTT-20241116-WA0035.opus
+!PTT-20241116-WA0036.opus
+!PTT-20241116-WA0037.opus
+!PTT-20241116-WA0038.opus
+!PTT-20241116-WA0039.opus
+!PTT-20241116-WA0041.opus
+!PTT-20241116-WA0042.opus
+!PTT-20241116-WA0043.opus
