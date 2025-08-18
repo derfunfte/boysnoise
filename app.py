@@ -6,6 +6,8 @@ import time
 import sys
 from pathlib import Path
 import json
+import torch
+from TTS.tts.configs.xtts_config import XttsConfig
 
 # --- Konfiguration ---
 try:
@@ -107,6 +109,7 @@ def generate_tts(text: str, language: str, speaker_file):
     status_message = ""
 
     try:
+        os.environ["COQUI_TOS_AGREED"] = "1"
         status_message += "Starte TTS-Generierung...\n"
         # 1. Eingabe validieren
         if not text or not text.strip():
@@ -140,8 +143,7 @@ def generate_tts(text: str, language: str, speaker_file):
             "--text", text,
             "--speaker_wav", speaker_path,
             "--language_idx", lang_idx,
-            "--out_path", str(output_path),
-            "--yes"
+            "--out_path", str(output_path)
         ]
         
         status_message += f"Führe TTS-Befehl aus: {' '.join(command)}\n"
@@ -214,9 +216,6 @@ with gr.Blocks(title="Voice Cloning & TTS App") as demo:
         inputs=[file_output],
         outputs=[file_output, audio_output, status_output]
     )
-
-    gr.Markdown("---")
-    status_output = gr.Textbox(label="Status & Logs", interactive=False, lines=10)
 
     
 
